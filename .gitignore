@@ -1,1 +1,5 @@
 .vscode/
+simplifier.dSYM/Contents/Info.plist
+.gitignore
+simplifier
+simplifier.dSYM/Contents/Resources/Relocations/aarch64/simplifier.yml
