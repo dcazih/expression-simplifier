@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define SIZE(array) sizeof array / sizeof array[0]
 
 int isInt(char * p);
 int in(char x, char list[], unsigned long len);
-void longToString(long l, char *out, size_t out_sz);
+void longToString(long double l, char *out, size_t out_sz);
 
 char operators[] = { '*', '/', '+', '-'};
 char notation[] = {'(', ')', ','};
@@ -60,7 +61,7 @@ int expr_parse(expression *e, char *line){
         while(isspace((unsigned char) *p)) p++;
         if (!*p) break;
 
-        // Catch +/- before strtol does
+        // Catch +/- before strtof does
         while (*p == '+' && !isFirstTerm){
             char s[2] = { '+', '\0' };
             expr_push(e, strdup(s));
@@ -79,13 +80,13 @@ int expr_parse(expression *e, char *line){
 
         // Parses out a long from str and returns the remaining str
         char *remainderPtr = NULL;
-        long x = strtol(p, &remainderPtr, 10);
+        long double x = strtof(p, &remainderPtr);
         
-        // Integer Parsing: if pointer3s different then an int was read
+        // Integer Parsing: if pointers different then an int was read
         if (remainderPtr != p){
-
+            
             char num[32];
-            snprintf(num, sizeof num, "%ld", x);
+            snprintf(num, sizeof num, "%.6Lg", x);
             expr_push(e, strdup(num));
 
             // Push pointer p forward
@@ -161,7 +162,7 @@ int expr_validate(expression *e){
         else opCount = 0;
         if (!strcmp(v, "-")) ++minusCount;
         else minusCount = 0;
-        printf("ocount:%d, nextval:%s, nextop:%d\n", opCount, nextVal, nextVIsOp);
+        // printf("ocount:%d, nextval:%s, nextop:%d\n", opCount, nextVal, nextVIsOp);
 
         // Return 1 if more than two consecutive minuses 
         if (opCount > 2 || (opCount == 2 && i == 1)) return 1;
@@ -171,11 +172,14 @@ int expr_validate(expression *e){
             if (expr_lshift(e, i, 1)) return 2;
         }
 
+       if (isInt(v)==1 && isInt(nextVal)==1) return 4;
+
         //////////////////////////////////////
 
         // Variable Checks:
         // Returns 3 if a number comes before a variable with no operator
-        if (isalpha(v[0]) && nextVal != NULL && isInt(nextVal)) return 3;
+        if (isalpha(v[0]) && nextVal != NULL && isInt(nextVal)==1) return 3;
+
 
         lastVal = v;
     }
@@ -189,43 +193,45 @@ int expr_eval(expression *e){
 
         size_t continueAtI=0;
         char str_buf[32];
+        char *lastLastLastVal = NULL;
         char *lastLastVal = NULL;
         char *lastVal = NULL;
         while (continueAtI < e->len-1){
             for (size_t i = continueAtI; i < e->len; i++){
                 char * v = e->data[i];
                 char *nextVal = (i != e->len-1) ? e->data[i+1] : NULL;
+                char *nextNextVal = (i != e->len-1) ? e->data[i+2] : NULL;
                 // if (lastLastVal) printf("lastlast:%s last:%s, curr: %s\n", lastLastVal, lastVal, v);
 
 
                 if (op == '*' && !strcmp(v, "*")){
                     // Neg-Pos Mult
-                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long product = strtol(lastVal, NULL, 10) * (strtol(e->data[i+1], NULL, 10));
+                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double product = strtof(lastVal, NULL) * (strtof(e->data[i+1], NULL));
                         longToString(product, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
                         break;
                     }
                     // Neg-Neg Mult
-                    else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal) && nextVal[0] == '-'){
-                        long product = strtol(lastVal, NULL, 10) * (strtol(e->data[i+2], NULL, 10));
+                    else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        long double product = strtof(lastVal, NULL) * (strtof(e->data[i+2], NULL));
                         longToString(product, str_buf, SIZE(str_buf));
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+3, 4);
                         break;
                     }
                     // Pos-Pos Mult
-                    else if (lastVal && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long product = strtol(lastVal, NULL, 10) * strtol(nextVal, NULL, 10);
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double product = strtof(lastVal, NULL) * strtof(nextVal, NULL);
                         longToString(product, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
                         break;
                     }
                     // Pos-Neg Mult
-                    else if (lastVal && nextVal && isInt(lastVal) && nextVal[0] == '-'){
-                        long product = strtol(lastVal, NULL, 10) * (strtol(e->data[i+2], NULL, 10));
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        long double product = strtof(lastVal, NULL) * (strtof(e->data[i+2], NULL));
                         longToString(product, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup("-");
                         e->data[i] = strdup(str_buf);
@@ -234,13 +240,51 @@ int expr_eval(expression *e){
                     }
 
                 }
+                if (op == '/' && !strcmp(v, "/")){
+                    // Neg-Pos Division
+                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+1], NULL));
+                        longToString(quotient, str_buf, SIZE(str_buf));
+                        e->data[i-1] = strdup(str_buf);
+                        expr_lshift(e, i+2, 2);
+                        break;
+                    }
+                    // Neg-Neg Division
+                    else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+2], NULL));
+                        longToString(quotient, str_buf, SIZE(str_buf));
+                        e->data[i-2] = strdup(str_buf);
+                        expr_lshift(e, i+3, 4);
+                        break;
+                    }
+                    // Pos-Pos Division
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double quotient = strtof(lastVal, NULL) / strtof(nextVal, NULL);
+                        longToString(quotient, str_buf, SIZE(str_buf));
+                        e->data[i-1] = strdup(str_buf);
+                        expr_lshift(e, i+2, 2);
+                        break;
+                    }
+                    // Pos-Neg Division
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+2], NULL));
+                        longToString(quotient, str_buf, SIZE(str_buf));
+                        e->data[i-1] = strdup("-");
+                        e->data[i] = strdup(str_buf);
+                        expr_lshift(e, i+3, 2);
+                        break;
+                    }
+
+                }
                 else if (op == '+' && !strcmp(v, "+")){
-                    printf("lastlast:%s last:%s, curr: %s, nect:%s, %s\n", lastLastVal, lastVal, v, nextVal, e->data[i+1]);
+
+                    
+                    // Integer Addition
                     // Neg-Pos Addition
-                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long sum = (-1 * strtol(lastVal, NULL, 10)) + (strtol(e->data[i+1], NULL, 10));
+                     if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double sum = (-1 * strtof(lastVal, NULL)) + (strtof(e->data[i+1], NULL));
                         if (sum < 0 ){
-                            longToString(labs(sum), str_buf, SIZE(str_buf));
+                            longToString(fabsl(sum), str_buf, SIZE(str_buf));
                             e->data[i-1] = strdup(str_buf);
                             expr_lshift(e, i+2, 2);
                             break;
@@ -254,33 +298,35 @@ int expr_eval(expression *e){
 
                     }
                     // Neg-Neg Addition
-                    else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal) && nextVal[0] == '-'){
-                        long sum = strtol(lastVal, NULL, 10) + (strtol(e->data[i+2], NULL, 10));
+                    else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        long double sum = strtof(lastVal, NULL) + (strtof(e->data[i+2], NULL));
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+3, 3);
                         break;
                     }
                     // Pos-Pos Addition
-                    else if (lastVal && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long sum = strtol(lastVal, NULL, 10) + strtol(nextVal, NULL, 10);
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double sum = strtof(lastVal, NULL) + strtof(nextVal, NULL);
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
                         break;
                     }
                     // Pos-Neg Addition
-                    else if (lastVal && nextVal && isInt(lastVal) && nextVal[0] == '-'){
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
                         e->data[i] = strdup("-");
                         expr_lshift(e, i+1, 1);
                         break;
                     }
+
+                    
                 }
                 else if (op == '-' && !strcmp(v, "-")){
                     // Neg-Pos Subtraction
-                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long difference = strtol(lastVal, NULL, 10) + strtol(nextVal, NULL, 10);
-                        longToString(labs(difference), str_buf, SIZE(str_buf));
+                    if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double difference = strtof(lastVal, NULL) + strtof(nextVal, NULL);
+                        longToString(fabsl(difference), str_buf, SIZE(str_buf));
                         e->data[i-2] = "-";
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
@@ -288,10 +334,10 @@ int expr_eval(expression *e){
                         break;
                     }
                     // Pos-Pos Subtraction
-                    else if (lastVal && nextVal && isInt(lastVal) && isInt(nextVal)){
-                        long difference = strtol(lastVal, NULL, 10) - strtol(nextVal, NULL, 10);
+                    else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        long double difference = strtof(lastVal, NULL) - strtof(nextVal, NULL);
                         if (difference < 0 ){
-                            longToString(labs(difference), str_buf, SIZE(str_buf));
+                            longToString(fabsl(difference), str_buf, SIZE(str_buf));
                             e->data[i-1] = "-";
                             e->data[i] = strdup(str_buf);
                             expr_lshift(e, i+2, 1);
@@ -299,7 +345,6 @@ int expr_eval(expression *e){
                             break;
                         }
                         else{
-                            printf("t");
                             longToString(difference, str_buf, SIZE(str_buf));
                             e->data[i-1] = strdup(str_buf);
                             expr_lshift(e, i+2, 2);
@@ -309,6 +354,7 @@ int expr_eval(expression *e){
                 }
 
                 continueAtI=i;
+                if (i>1) lastLastLastVal = lastLastVal;
                 if (i>0) lastLastVal = lastVal;
                 lastVal = v;
             }
@@ -370,9 +416,12 @@ int main()
                 else if (validationError == 3){
                     printf("Error: Number before variable\n");
                 }
+                else if (validationError == 4){
+                    printf("Error: Missing operator between integers\n");
+                }
                 else if(validationError != -1) {
                     // Evaluate Expression
-                    int evaluationError = expr_eval(&e);
+                    int evaluationError = 0; expr_eval(&e);
                     if (evaluationError){
                     }
                     else expr_print(&e);
@@ -399,11 +448,11 @@ int isInt(char * p){
     if (p == NULL) return -1;
     char *end = NULL;
     char *check = p;
-    strtol(check, &end, 10);
+    strtof(check, &end);
     if (end != check) return 1;
     return 0;
 }
 
-void longToString(long l, char *out, size_t out_sz) {
-    snprintf(out, out_sz, "%ld", l);
+void longToString(long double l, char *out, size_t out_sz) {
+    snprintf(out, out_sz, "%Lg", l);
 }
