@@ -30,7 +30,8 @@ int expr_push(expression *e, char *s){
     if (e->len == e->capacity){
         size_t new_capacity = (e->capacity) ? e->capacity*2 : 8;
         char **new_data_space = realloc(e->data, new_capacity * sizeof *new_data_space);
-        if(!new_data_space) return 0;
+        if(!new_data_space) return 0; // ran out of memory
+        
         e->data = new_data_space;
         e->capacity = new_capacity;
     }
@@ -73,10 +74,10 @@ int expr_parse(expression *e, char *line){
         while(isspace((unsigned char) *p)) p++;
         if (!*p) break;
 
-        // Catch +/- before strtof does
+        // Catch +/- before strtold does
         while (*p == '+' && !isFirstTerm){
             char s[2] = { '+', '\0' };
-            expr_push(e, strdup(s));
+            expr_push(e, s);
             p++;
             while(isspace((unsigned char) *p)) p++;
             if (!*p) break;
@@ -84,7 +85,7 @@ int expr_parse(expression *e, char *line){
 
         while (*p == '-'){
             char s[2] = { '-', '\0' };
-            expr_push(e, strdup(s));
+            expr_push(e, s);
             p++;
             while(isspace((unsigned char) *p)) p++;
             if (!*p) break;
@@ -92,14 +93,14 @@ int expr_parse(expression *e, char *line){
 
         // Parses out a long from str and returns the remaining str
         char *remainderPtr = NULL;
-        long double x = strtof(p, &remainderPtr);
+        long double x = strtold(p, &remainderPtr);
         
         // Integer Parsing: if pointers different then an int was read
         if (remainderPtr != p){
             
             char num[32];
             snprintf(num, sizeof num, "%.6Lg", x);
-            expr_push(e, strdup(num));
+            expr_push(e, num);
 
             // Push pointer p forward
             p = remainderPtr;
@@ -117,15 +118,15 @@ int expr_parse(expression *e, char *line){
                     if (isFirstTerm && c != '-'){
                         invalidExpr = 1;
                         break;
-                    }else expr_push(e, strdup(s));
+                    }else expr_push(e, s);
                 }
                 else if(in(c, notation, SIZE(notation))){
                     // printf("Notation: %c", c);
-                    expr_push(e, strdup(s));
+                    expr_push(e, s);
                 }
                 else if(isalpha(c)){
                     // printf("Variable: %c", c);
-                    expr_push(e, strdup(s));
+                    expr_push(e, s);
                 }
                 else {
                     printf("Cannot Parse: %c\n", c);
@@ -224,7 +225,7 @@ int expr_eval(expression *e, int debug){
             if (!strcmp(v, "*")){
                 // Neg-Pos Mult
                 if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
-                    long double product = strtof(lastVal, NULL) * (strtof(e->data[i+1], NULL));
+                    long double product = strtold(lastVal, NULL) * (strtold(e->data[i+1], NULL));
                     longToString(product, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup(str_buf);
                     expr_lshift(e, i+2, 2);
@@ -232,7 +233,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Neg-Neg Mult
                 else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
-                    long double product = strtof(lastVal, NULL) * (strtof(e->data[i+2], NULL));
+                    long double product = strtold(lastVal, NULL) * (strtold(e->data[i+2], NULL));
                     longToString(product, str_buf, SIZE(str_buf));
                     e->data[i-2] = strdup(str_buf);
                     expr_lshift(e, i+3, 4);
@@ -240,7 +241,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Pos-Pos Mult
                 else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
-                    long double product = strtof(lastVal, NULL) * strtof(nextVal, NULL);
+                    long double product = strtold(lastVal, NULL) * strtold(nextVal, NULL);
                     longToString(product, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup(str_buf);
                     expr_lshift(e, i+2, 2);
@@ -248,7 +249,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Pos-Neg Mult
                 else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
-                    long double product = strtof(lastVal, NULL) * (strtof(e->data[i+2], NULL));
+                    long double product = strtold(lastVal, NULL) * (strtold(e->data[i+2], NULL));
                     longToString(product, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup("-");
                     e->data[i] = strdup(str_buf);
@@ -260,7 +261,7 @@ int expr_eval(expression *e, int debug){
             if (!strcmp(v, "/")){
                 // Neg-Pos Division
                 if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
-                    long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+1], NULL));
+                    long double quotient = strtold(lastVal, NULL) / (strtold(e->data[i+1], NULL));
                     longToString(quotient, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup(str_buf);
                     expr_lshift(e, i+2, 2);
@@ -268,7 +269,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Neg-Neg Division
                 else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
-                    long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+2], NULL));
+                    long double quotient = strtold(lastVal, NULL) / (strtold(e->data[i+2], NULL));
                     longToString(quotient, str_buf, SIZE(str_buf));
                     e->data[i-2] = strdup(str_buf);
                     expr_lshift(e, i+3, 4);
@@ -276,7 +277,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Pos-Pos Division
                 else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
-                    long double quotient = strtof(lastVal, NULL) / strtof(nextVal, NULL);
+                    long double quotient = strtold(lastVal, NULL) / strtold(nextVal, NULL);
                     longToString(quotient, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup(str_buf);
                     expr_lshift(e, i+2, 2);
@@ -284,7 +285,7 @@ int expr_eval(expression *e, int debug){
                 }
                 // Pos-Neg Division
                 else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
-                    long double quotient = strtof(lastVal, NULL) / (strtof(e->data[i+2], NULL));
+                    long double quotient = strtold(lastVal, NULL) / (strtold(e->data[i+2], NULL));
                     longToString(quotient, str_buf, SIZE(str_buf));
                     e->data[i-1] = strdup("-");
                     e->data[i] = strdup(str_buf);
@@ -313,7 +314,7 @@ int expr_eval(expression *e, int debug){
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
                     if (debug) printf("Neg-Pos Addition (Multi-1 case)\n");
 
-                    long double sum = (-strtof(lastLastVal, NULL) + 1.0);
+                    long double sum = (-strtold(lastLastVal, NULL) + 1.0);
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (sum == 0){
                         if (i <= 3) e->data[i - 3] = "0";
@@ -345,7 +346,7 @@ int expr_eval(expression *e, int debug){
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     if (debug) printf("Neg-Pos Addition (1-Multi case)\n");
 
-                    long double sum = (-1.0 + strtof(nextVal, NULL));
+                    long double sum = (-1.0 + strtold(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (sum == 0){
                         e->data[i - ((i <= 2) ? 2 : 1)] = "0";
@@ -373,7 +374,7 @@ int expr_eval(expression *e, int debug){
                 else if (lastLastLastVal && nextNextVal && (lastLastLastVal[0] =='-') && isInt(lastLastVal)==1 && isalpha(lastVal[0]) 
                         && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     if (debug) printf("Neg-Pos Addition (Multi-Multi case)\n");
-                    long double sum = (-strtof(lastLastVal, NULL) + strtof(nextVal, NULL));
+                    long double sum = (-strtold(lastLastVal, NULL) + strtold(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
 
                     if (sum == 0){
@@ -410,7 +411,7 @@ int expr_eval(expression *e, int debug){
                 // Pos-Pos Addition (Multi-Multi case)
                 if (lastLastVal && nextVal && nextNextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) &&
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    long double sum = (strtof(lastLastVal, NULL) + strtof(nextVal, NULL));
+                    long double sum = (strtold(lastLastVal, NULL) + strtold(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (debug) printf("Pos-Pos Addition (Multi-Multi case)\n");
 
@@ -432,7 +433,7 @@ int expr_eval(expression *e, int debug){
                 
                 // Pos-Pos Addition (Multi-1 case)
                 else if (lastLastVal && nextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
-                    long double sum = (strtof(lastLastVal, NULL) + 1.0);
+                    long double sum = (strtold(lastLastVal, NULL) + 1.0);
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (debug) printf("Pos-Pos Addition (Multi-1 case)\n");
 
@@ -451,7 +452,7 @@ int expr_eval(expression *e, int debug){
                 
                 // Pos-Pos Addition (1-Multi case)
                 else if (lastVal && nextNextVal  && isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    long double sum = (1.0 + strtof(nextVal, NULL));
+                    long double sum = (1.0 + strtold(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (debug) printf("Pos-Pos Addition (1-Multi case)\n");
 
@@ -483,7 +484,7 @@ int expr_eval(expression *e, int debug){
                     // Neg-Pos Addition
                     if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
                         if(debug) printf("Neg-Pos Addition \n");
-                        long double sum = (-1 * strtof(lastVal, NULL)) + (strtof(e->data[i+1], NULL));
+                        long double sum = (-1 * strtold(lastVal, NULL)) + (strtold(e->data[i+1], NULL));
                         if (sum < 0 ){
                             longToString(fabsl(sum), str_buf, SIZE(str_buf));
                             e->data[i-1] = strdup(str_buf);
@@ -501,7 +502,7 @@ int expr_eval(expression *e, int debug){
                     // Neg-Neg Addition
                     else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
                         if(debug) printf("Neg-Neg Addition \n");
-                        long double sum = strtof(lastVal, NULL) + (strtof(e->data[i+2], NULL));
+                        long double sum = strtold(lastVal, NULL) + (strtold(e->data[i+2], NULL));
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+3, 3);
@@ -512,7 +513,7 @@ int expr_eval(expression *e, int debug){
                     // Pos-Pos Addition
                     else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
                         if(debug) printf("Pos-Pos Addition \n");
-                        long double sum = strtof(lastVal, NULL) + strtof(nextVal, NULL);
+                        long double sum = strtold(lastVal, NULL) + strtold(nextVal, NULL);
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
@@ -539,7 +540,7 @@ int expr_eval(expression *e, int debug){
                 // Neg-Pos Subtraction (Multi-Multi case)
                 if (lastLastLastVal && nextNextVal && (lastLastLastVal[0] =='-') && isInt(lastLastVal)==1 &&
                     isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    long double difference = (-strtof(lastLastVal, NULL) - strtof(nextVal, NULL));
+                    long double difference = (-strtold(lastLastVal, NULL) - strtold(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (debug) printf("Neg-Pos Subtraction (Multi-Multi case)\n");
 
@@ -567,7 +568,7 @@ int expr_eval(expression *e, int debug){
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
                     if (debug) printf("Neg-Pos Subtraction (Multi-1 case)\n");
                     
-                    long double difference = (-strtof(lastLastVal, NULL) - 1.0);
+                    long double difference = (-strtold(lastLastVal, NULL) - 1.0);
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     
                     if (difference == 0){
@@ -589,7 +590,7 @@ int expr_eval(expression *e, int debug){
                 // Neg-Pos Subtraction (1-Multi case)
                 else if (lastLastVal && nextNextVal && (lastLastVal[0] =='-')  &&
                     isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    long double difference = (-1.0 - strtof(nextVal, NULL));
+                    long double difference = (-1.0 - strtold(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (debug) printf("Neg-Pos Subtraction (1-Multi case)\n");
                     if (difference == 1 ){
@@ -627,7 +628,7 @@ int expr_eval(expression *e, int debug){
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     if (debug) printf("Pos-Pos Subtraction (Multi-Multi case)\n");
                     
-                    long double difference = (strtof(lastLastVal, NULL) - strtof(nextVal, NULL));
+                    long double difference = (strtold(lastLastVal, NULL) - strtold(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
                         e->data[i-2] = strdup(str_buf);
@@ -657,7 +658,7 @@ int expr_eval(expression *e, int debug){
                 // Pos-Pos Subtraction (Multi-1 case)
                 else if (lastLastVal && nextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
                     if (debug) printf("Pos-Pos Subtraction (Multi-1 case)\n");
-                    long double difference = (strtof(lastLastVal, NULL) - 1.0);
+                    long double difference = (strtold(lastLastVal, NULL) - 1.0);
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
                         if (i <= 3) e->data[i - 2] = strdup(str_buf);
@@ -681,7 +682,7 @@ int expr_eval(expression *e, int debug){
                 // Pos-Pos Subtraction (1-Multi case)
                 else if (lastVal && nextNextVal  && isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     if (debug) printf("Pos-Pos Subtraction (1-Multi case)\n");
-                    long double difference = (1.0 - strtof(nextVal, NULL));
+                    long double difference = (1.0 - strtold(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
                         if (i <= 3) e->data[i - 2] = strdup(str_buf);
@@ -724,7 +725,7 @@ int expr_eval(expression *e, int debug){
                 if (!nextNextVal || !isalpha((unsigned char)nextNextVal[0])){
                     // Neg-Pos Subtraction
                     if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1 ){
-                        long double difference = strtof(lastVal, NULL) + strtof(nextVal, NULL);
+                        long double difference = strtold(lastVal, NULL) + strtold(nextVal, NULL);
                         longToString(fabsl(difference), str_buf, SIZE(str_buf));
                         if (debug) printf("Neg-Pos Subtraction \n");
                         e->data[i-2] = "-";
@@ -736,7 +737,7 @@ int expr_eval(expression *e, int debug){
                     }
                     // Pos-Pos Subtraction
                     else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
-                        long double difference = strtof(lastVal, NULL) - strtof(nextVal, NULL);
+                        long double difference = strtold(lastVal, NULL) - strtold(nextVal, NULL);
 
                         if(debug) printf("Pos-Pos Subtraction <0 \n");
                         if (difference < 0 ){
@@ -772,6 +773,7 @@ char *expr_curr(expression *e){
 }
 
 void expr_free(expression *e){
+    for (size_t i = 0; i < e->len; i++) free(e->data[i]);
     free(e->data); e->data = NULL; e->len = 0; e->capacity = 0;
 }
 
@@ -789,9 +791,19 @@ int main()
 
         printf("Enter expression> ");
 
-        char line[1024];
+        char line[12288];
         if (fgets(line, sizeof line, stdin)){
 
+            // Check if input is too long
+            size_t len = strlen(line);
+            if (len > 0 && line[len - 1] != '\n') {
+                int ch;
+                while ((ch = getchar()) != '\n' && ch != EOF) {}
+                printf("Error: Input too long\n");
+                expr_free(&e);
+                continue;
+            }
+            
             // Parse Expression 
             int parseError = expr_parse(&e, line);
             if (parseError) {
@@ -814,7 +826,7 @@ int main()
                 }
                 else if(validationError != -1) {
                     // Evaluate Expression
-                    int evaluationError = 0;//expr_eval(&e, 0);
+                    int evaluationError = expr_eval(&e, 0);
                     if (evaluationError){
                     }
                     else expr_print(&e);
@@ -841,7 +853,7 @@ int isInt(char * p){
     if (p == NULL) return -1;
     char *end = NULL;
     char *check = p;
-    strtof(check, &end);
+    strtold(check, &end);
     if (end != check) return 1;
     return 0;
 }
