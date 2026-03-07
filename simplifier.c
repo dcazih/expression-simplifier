@@ -40,6 +40,18 @@ int expr_push(expression *e, char *s){
     return 1;
 }
 
+void expr_print(expression *e){
+
+    for (size_t i = 0; i < e->len; i++){
+        char *nextVal = (i + 1 < e->len) ? e->data[i + 1] : NULL;
+
+        printf("%s", e->data[i]);
+        if (nextVal && !isalpha(nextVal[0])) printf(" ");
+    }
+    printf("\n");
+}
+
+
 int expr_lshift(expression *e, int index, int shift){
     // Returns 1 if shift failed
     if (index - shift < 0) return 1;
@@ -186,7 +198,7 @@ int expr_validate(expression *e){
     return 0;
 }
 
-int expr_eval(expression *e){
+int expr_eval(expression *e, int debug){
 
     size_t continueAtI=0;
     char str_buf[32];
@@ -195,8 +207,10 @@ int expr_eval(expression *e){
     char *lastLastLastVal = NULL;
     while (continueAtI < e->len-1){
         for (size_t i = continueAtI; i < e->len; i++){
+            if (debug) printf("starts %zu\n", i);
             char * v = e->data[i];
             if (i == 0 && (!strcmp(v, "+") || !strcmp(v, "-"))) {
+                if (debug) printf("skipped %s\n", v);
                 lastVal = v;
                 continue;
             };
@@ -205,8 +219,7 @@ int expr_eval(expression *e){
             char *nextNextVal = (i + 2 < e->len) ? e->data[i + 2] : NULL;
             // if (lastLastVal) printf("lastlast:%s last:%s, curr: %s\n", lastLastVal, lastVal, v);
 
-            printf("starts %zu\n", i);
-            fflush(stdout);
+
 
             if (!strcmp(v, "*")){
                 // Neg-Pos Mult
@@ -287,8 +300,10 @@ int expr_eval(expression *e){
                 // Neg-Pos Addition (1-1 case)
                 if (lastLastVal && nextVal && (lastLastVal[0] =='-') && 
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
+                    if (debug) printf("Neg-Pos Addition (1-1 case)\n");
                     e->data[i - ((i <= 2) ? 2 : 1)] = "0";
                     expr_lshift(e, i+2, ((i <= 2) ? 3 : 2));
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;            
                 }
@@ -296,6 +311,8 @@ int expr_eval(expression *e){
                 // Neg-Pos Addition (Multi-1 case)
                 else if (lastLastLastVal && nextVal && (lastLastLastVal[0] =='-') && isInt(lastLastVal)==1 &&
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
+                    if (debug) printf("Neg-Pos Addition (Multi-1 case)\n");
+
                     long double sum = (-strtof(lastLastVal, NULL) + 1.0);
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (sum == 0){
@@ -318,6 +335,7 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+1, 2);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -325,6 +343,8 @@ int expr_eval(expression *e){
                 // Neg-Pos Addition (1-Multi case)
                 else if (lastLastVal && nextNextVal && (lastLastVal[0] =='-')  && isalpha(lastVal[0]) &&
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
+                    if (debug) printf("Neg-Pos Addition (1-Multi case)\n");
+
                     long double sum = (-1.0 + strtof(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
                     if (sum == 0){
@@ -344,6 +364,7 @@ int expr_eval(expression *e){
                         e->data[i - ((i <= 2) ? 2 : 1)] = strdup(str_buf);
                         expr_lshift(e, i+2, ((i <= 2) ? 3 : 2));
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -351,6 +372,7 @@ int expr_eval(expression *e){
                 // Neg-Pos Addition (Multi-Multi case)
                 else if (lastLastLastVal && nextNextVal && (lastLastLastVal[0] =='-') && isInt(lastLastVal)==1 && isalpha(lastVal[0]) 
                         && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
+                    if (debug) printf("Neg-Pos Addition (Multi-Multi case)\n");
                     long double sum = (-strtof(lastLastVal, NULL) + strtof(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
 
@@ -380,6 +402,7 @@ int expr_eval(expression *e){
                             expr_lshift(e, i+2, 3);
                         }
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -389,6 +412,7 @@ int expr_eval(expression *e){
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     long double sum = (strtof(lastLastVal, NULL) + strtof(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
+                    if (debug) printf("Pos-Pos Addition (Multi-Multi case)\n");
 
                     if (sum == 0){
                         e->data[i - ((i <= 3) ? 3 : 2)] = strdup(str_buf);
@@ -401,6 +425,7 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+2, 3);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -409,6 +434,9 @@ int expr_eval(expression *e){
                 else if (lastLastVal && nextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
                     long double sum = (strtof(lastLastVal, NULL) + 1.0);
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
+                    if (debug) printf("Pos-Pos Addition (Multi-1 case)\n");
+
+                    
                     if (sum == 1){
                         expr_lshift(e, i+1, 3);
                     }
@@ -416,6 +444,7 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+1, 2);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }                   
@@ -424,6 +453,8 @@ int expr_eval(expression *e){
                 else if (lastVal && nextNextVal  && isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     long double sum = (1.0 + strtof(nextVal, NULL));
                     longToString(fabsl(sum), str_buf, SIZE(str_buf));
+                    if (debug) printf("Pos-Pos Addition (1-Multi case)\n");
+
                     if (sum == 1){
                         expr_lshift(e, i+2, 3);
                     }                  
@@ -431,14 +462,17 @@ int expr_eval(expression *e){
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }              
                 
                 // Pos-Pos Addition (1-1 case)
                 else if (lastVal && nextVal && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
+                    if (debug) printf("Pos-Pos Addition (1-1 case)\n");
                     e->data[i-1] = "2";
                     expr_lshift(e, i+1, 1);
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -448,6 +482,7 @@ int expr_eval(expression *e){
                 if (!nextNextVal || !isalpha((unsigned char)nextNextVal[0])){                                                                    
                     // Neg-Pos Addition
                     if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        if(debug) printf("Neg-Pos Addition \n");
                         long double sum = (-1 * strtof(lastVal, NULL)) + (strtof(e->data[i+1], NULL));
                         if (sum < 0 ){
                             longToString(fabsl(sum), str_buf, SIZE(str_buf));
@@ -459,31 +494,44 @@ int expr_eval(expression *e){
                             e->data[i-2] = strdup(str_buf);
                             expr_lshift(e, i+3, 3);
                         }
-                        continueAtI++;
+                        if(debug) expr_print(e);
+                        continueAtI=0;
                         break;
                     }
                     // Neg-Neg Addition
                     else if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        if(debug) printf("Neg-Neg Addition \n");
                         long double sum = strtof(lastVal, NULL) + (strtof(e->data[i+2], NULL));
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+3, 3);
+                        if(debug) expr_print(e);
+                        continueAtI=0;
+                        break;
                     }
                     // Pos-Pos Addition
                     else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
+                        if(debug) printf("Pos-Pos Addition \n");
                         long double sum = strtof(lastVal, NULL) + strtof(nextVal, NULL);
                         longToString(sum, str_buf, SIZE(str_buf));
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
+                        if(debug) expr_print(e);
+                        continueAtI=0;
+                        break;
                     }
                     // Pos-Neg Addition
                     else if (lastVal && nextVal && isInt(lastVal)==1 && nextVal[0] == '-'){
+                        if(debug) printf("Pos-Neg Addition \n");
                         e->data[i] = strdup("-");
                         expr_lshift(e, i+1, 1);
+                        if(debug) expr_print(e);
+                        continueAtI=0;
+                        break;
                     }
-                    continueAtI++;
-                    break;
+
                 }
+            
             }
             if (!strcmp(v, "-")){
                 ////////////////////////////
@@ -493,7 +541,7 @@ int expr_eval(expression *e){
                     isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     long double difference = (-strtof(lastLastVal, NULL) - strtof(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
-                        printf("Neg-Pos Subtraction (Multi-Multi case)\n");
+                    if (debug) printf("Neg-Pos Subtraction (Multi-Multi case)\n");
 
                     if (difference == 0){
                         e->data[i - ((i <= 3) ? 3 : 2)] = strdup(str_buf);
@@ -509,6 +557,7 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+2, 3);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }                 
@@ -516,9 +565,11 @@ int expr_eval(expression *e){
                 // Neg-Pos Subtraction (Multi-1 case)
                 else if (lastLastLastVal && nextVal && (lastLastLastVal[0] =='-') && isInt(lastLastVal)==1 &&
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
-                        printf("Neg-Pos Subtraction (Multi-1 case)\n");
+                    if (debug) printf("Neg-Pos Subtraction (Multi-1 case)\n");
+                    
                     long double difference = (-strtof(lastLastVal, NULL) - 1.0);
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
+                    
                     if (difference == 0){
                         e->data[i - ((i <= 3) ? 3 : 2)] = strdup(str_buf);
                         expr_lshift(e, i+3, ((i <= 3) ? 4 : 3));
@@ -530,6 +581,7 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+1, 2);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
@@ -539,7 +591,7 @@ int expr_eval(expression *e){
                     isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
                     long double difference = (-1.0 - strtof(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
-                    printf("Neg-Pos Subtraction (1-Multi case)\n");
+                    if (debug) printf("Neg-Pos Subtraction (1-Multi case)\n");
                     if (difference == 1 ){
                         expr_lshift(e, i+2, 4);
                     }
@@ -554,15 +606,18 @@ int expr_eval(expression *e){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+2, 3);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }
+                
                 // Neg-Pos Subtraction (1-1 case)
                 else if (lastLastVal && nextVal && (lastLastVal[0] =='-') && 
                     isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
-                    printf("Neg-Pos Subtraction (1-1 case)\n");
+                    if (debug) printf("Neg-Pos Subtraction (1-1 case)\n");
                     e->data[i-1] = "2";
                     expr_lshift(e, i+1, 1);
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;          
                 }
@@ -570,68 +625,62 @@ int expr_eval(expression *e){
                 // Pos-Pos Subtraction (Multi-Multi case)
                 if (lastLastVal && nextNextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) &&
                         isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    printf("Pos-Pos Subtraction (Multi-Multi case)\n");
+                    if (debug) printf("Pos-Pos Subtraction (Multi-Multi case)\n");
+                    
                     long double difference = (strtof(lastLastVal, NULL) - strtof(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+3, 4);
-                        printf("gooch\n");
-
                     }
                     else if (difference == 1){
                         expr_lshift(e, i+2, 4);
-                        break;
                     }
                     else if (difference == -1){
                         e->data[i-3] = "-";
                         expr_lshift(e, i+2, 4);
-                        break;
                     }
                     else if (difference < 0){
                         e->data[i-3] = "-";
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+2, 3);
-                        break;
                     }
                     else{
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+2, 3);
-                        break;
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;                   
                 }
                 
                 // Pos-Pos Subtraction (Multi-1 case)
                 else if (lastLastVal && nextVal && isInt(lastLastVal)==1 && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
-                    printf("Pos-Pos Subtraction (Multi-1 case)\n");
+                    if (debug) printf("Pos-Pos Subtraction (Multi-1 case)\n");
                     long double difference = (strtof(lastLastVal, NULL) - 1.0);
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
                         if (i <= 3) e->data[i - 2] = strdup(str_buf);
                         expr_lshift(e, i+2, ((i <= 3) ? 3 : 5));
-                        break;
                     }
                     else if (difference == 1){
                         expr_lshift(e, i+1, 3);
-                        break;
                     }
                     else if (difference == -1){
                         expr_lshift(e, i, 3);
-                        break;
                     }
                     else{ 
                         e->data[i-2] = strdup(str_buf);
                         expr_lshift(e, i+1, 2);
-                        break;
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }                   
+                
                 // Pos-Pos Subtraction (1-Multi case)
                 else if (lastVal && nextNextVal  && isalpha(lastVal[0]) && isInt(nextVal)==1 && isalpha(nextNextVal[0]) && lastVal[0] == nextNextVal[0]){
-                    printf("Pos-Pos Subtraction (1-Multi case)\n");
+                    if (debug) printf("Pos-Pos Subtraction (1-Multi case)\n");
                     long double difference = (1.0 - strtof(nextVal, NULL));
                     longToString(fabsl(difference), str_buf, SIZE(str_buf));
                     if (difference == 0){
@@ -654,14 +703,19 @@ int expr_eval(expression *e){
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
                     }
+                    if (debug) expr_print(e);
                     continueAtI = 0;
                     break;
                 }              
+                
                 // Pos-Pos Subtraction (1-1 case)
                 else if (lastVal && nextVal && isalpha(lastVal[0]) && isalpha(nextVal[0]) && lastVal[0] == nextVal[0]){
-                    printf("Pos-Pos Subtraction (1-1 case)\n");
+                    if (debug) printf("Pos-Pos Subtraction (1-1 case)\n");
+                    
                     if (i <= 2) e->data[i-1] = "0";
                     expr_lshift(e, i+2, ((i <= 2) ? 2 : 4));
+                    if (debug) expr_print(e);
+                    continueAtI = 0;
                     break;            
                 }
 
@@ -672,17 +726,19 @@ int expr_eval(expression *e){
                     if (lastLastVal && (lastLastVal[0] =='-') && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1 ){
                         long double difference = strtof(lastVal, NULL) + strtof(nextVal, NULL);
                         longToString(fabsl(difference), str_buf, SIZE(str_buf));
-                        printf("Neg-Pos Subtraction \n");
+                        if (debug) printf("Neg-Pos Subtraction \n");
                         e->data[i-2] = "-";
                         e->data[i-1] = strdup(str_buf);
                         expr_lshift(e, i+2, 2);
-                        continueAtI++;
+                        if (debug) expr_print(e);
+                        continueAtI=0;
                         break;
                     }
                     // Pos-Pos Subtraction
                     else if (lastVal && nextVal && isInt(lastVal)==1 && isInt(nextVal)==1){
                         long double difference = strtof(lastVal, NULL) - strtof(nextVal, NULL);
-                        printf("Pos-Pos Subtraction <0 \n");
+
+                        if(debug) printf("Pos-Pos Subtraction <0 \n");
                         if (difference < 0 ){
                             longToString(fabsl(difference), str_buf, SIZE(str_buf));
                             e->data[i-1] = "-";
@@ -694,7 +750,8 @@ int expr_eval(expression *e){
                             e->data[i-1] = strdup(str_buf);
                             expr_lshift(e, i+2, 2);
                         }
-                        continueAtI++;
+                        if (debug) expr_print(e);
+                        continueAtI=0;
                         break;
                     }
                 }
@@ -712,17 +769,6 @@ int expr_eval(expression *e){
 
 char *expr_curr(expression *e){
     return e->data[e->len-1];
-}
-
-void expr_print(expression *e){
-
-    for (size_t i = 0; i < e->len; i++){
-        char *nextVal = (i + 1 < e->len) ? e->data[i + 1] : NULL;
-
-        printf("%s", e->data[i]);
-        if (nextVal && !isalpha(nextVal[0])) printf(" ");
-    }
-    printf("\n");
 }
 
 void expr_free(expression *e){
@@ -768,7 +814,7 @@ int main()
                 }
                 else if(validationError != -1) {
                     // Evaluate Expression
-                    int evaluationError = expr_eval(&e);
+                    int evaluationError = 0;//expr_eval(&e, 0);
                     if (evaluationError){
                     }
                     else expr_print(&e);
